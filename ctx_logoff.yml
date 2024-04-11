@@ -1,0 +1,66 @@
+- name: Logoff Citrix user session
+  hosts: windows
+  gahter_facts: no
+  become_method: runas
+
+  vars:
+    method: "{{ item }}"
+    username: "{{ item }}"
+    domain_user: "{{ item }}"
+
+  tasks:
+  - name: Display message when more than one host is selected
+    debug:
+      msg: "Too many hosts provided! Select only one host"
+    when: ansible_play_hosts | length > 1
+
+  - name: Stop playbook when more than one host is selected"
+    meta: end_play
+    when: ansible_play_hosts | length > 1
+
+  - name: Method 1 - Kill emuser process and logoff user session
+    win_shell: |
+      $SessionId = ((quser | ? {$_ -match "{{ username }}" }) -split ' +')[3]
+      $SessionId
+      $ProcessId = Get-Process -name "emuser" | Where-Object {$_.SessionId -eq "$SessionId"} | Select id -ExpandProperty id
+      if ($SessionId -eq $Null) (Write-Host "user session does not exist"} else {
+         Stop-Process -Id $ProcessID -Verbose -Force
+         logoff $SessionId
+         if (!$SessionId.HasExited) {Write-Host -NoNewLine "user "{{ username }}" successfully logged off"}
+      }
+    register: logoff_status
+    ignore_errors: yes
+    when: (method == "1")
+
+  - name: Show logoff session task status - Method 1"
+    debug:
+      msg: "{{ logoff_status.stdout_lines }}"
+    when: (method == "1") and (logoff_status.stdout_lines is defined)
+
+  - name: Method 2 - step A - Kill user processes
+    win_shell: |
+      $UserProcesses = Get-Process -IncludeUserName | Where-Object {$_.UserName -eq "{{ domain_user }}" } | Select ProcessName, UserName, VirtualMemorySize, CPU
+      $UserProcesses
+      foreach ($process in $UserProcesses.ProcessName)
+             { Stop-Process -Name $Process -Verbose -Force
+             }
+    become: yes
+    become_user: <your_user_with_admin_privs_on_sever>
+    when: (method == "2")
+
+  - name: Method 2 - Step B - Logoff session after user processes are killed
+    win_shell: |
+      $SessionId = ((quser | ? {$_ -match "{{ username }}" - split ' +')[2]
+      $SessionId
+      if ($SessionId -eq $Null) { Write-Host "User session does not exist" } else {
+         logoff $SessionId
+         if ($SessionId.HasExited) { Write-host -NoNewLine "User "{{ username }}" successfully logged off"}
+      }
+      Exit
+    register: logoff_status2
+    when: (method == "2")
+
+  - name: Show logoff session task status - Method 2
+    debug:
+      msg: "{{ logoff_status2.stdout_lines }}"
+    when: (method == "2") and (logoff_status2.stdout_lines is defined)
