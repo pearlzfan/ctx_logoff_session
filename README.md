@@ -4,3 +4,9 @@ This playbook executes Powershell scripts that logs off user selected by Tower A
 * "user {{ username }} session successfully logged off"
 
 Playbook will not enable operator to enter more than one server name to prevent unwanted logoffs and mistakes.
+Operator can define extra variables in the jobtemplate's survey:
+* method - select one of two method to logoff the user
+  1 - stop the emuser service and logoff user's session
+  2 - kill user's processes and session logoff
+* username - enter username for method 1: stop emuser service
+* domain_user - enter domain\username for method 2: kill users processes and then logoff
