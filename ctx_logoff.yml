@@ -1,3 +1,4 @@
+#Citrix user session logoff playbook
 - name: Logoff Citrix user session
   hosts: windows
   gahter_facts: no
